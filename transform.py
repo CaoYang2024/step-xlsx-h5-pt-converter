@@ -8,8 +8,8 @@ STEP/STP → Surface Mesh (via gmsh) → Export:
 - normals:    (T,3) float32 [optional] Triangle face normals (if --normals is enabled)
 
 Examples:
-  python step_to_mesh_with_topology.py part.step out.pt --lc 1.5 --target_points 80000
-  python step_to_mesh_with_topology.py part.stp  out.h5 --lc 2.0 --normals
+  python transform.py part.step out.pt --lc 1.5 --target_points 80000
+  python transform.py part.stp  out.h5 --lc 2.0 --normals
 """
 
 from __future__ import annotations

@@ -16,6 +16,7 @@ env/
 *.pt
 *.h5
 *.npy
+*.png
 
 # 日志和缓存
 *.log

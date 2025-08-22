@@ -32,6 +32,9 @@ def plot_points(points, out_path=None, show=True, s=1):
     ax.set_ylabel("Y")
     ax.set_zlabel("Z")
     ax.set_box_aspect([1, 1, 1])  # Equal aspect ratio
+    ax.set_xlim([0, 300])
+    ax.set_ylim([0, 300])
+    ax.set_zlim([0, 300])
     plt.tight_layout()
 
     if out_path:

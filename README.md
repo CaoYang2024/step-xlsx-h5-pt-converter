@@ -8,7 +8,6 @@ A lightweight toolkit for converting forming simulation data (XLSX, STEP) into u
 - **step2h5.py** — Mesh STEP with Gmsh, export to HDF5 groups
 - **h5plot.py** — Animate deformations (GIF/MP4/PNG)
 - **h5_shape.py** — Inspect attributes and dataset shapes
-- **plot_pt.py** — Render .pt mesh to PNG (thickness coloring)
 - **pt2png.py** — Quick 3D preview from .pt
 - **png2gif.py** — Make GIF from PNG sequence
 ---
@@ -60,19 +59,78 @@ python h5show.py your_file.h5
 This script visualizes **FE shell meshes** stored in an HDF5 file and can:
 
 - Render a static deformed frame (PNG).
-
 - Create a time-series animation (GIF/MP4) using node_displacement.
-
 - Optionally color faces by thickness (element_shell_thickness) or effective plastic strain (element_shell_effective_plastic_strain).
-
+---
 It expects a group like OP10/blank containing the usual datasets:
 
 - node_coordinates (N,3)
-
 - element_shell_node_indexes (E,4) or element_shell_node_ids (E,4)
-
 - node_displacement (T,N,3) (required for animation)
-
 -  element_shell_thickness (E,) or (T,E),
-
 - element_shell_effective_plastic_strain (T,E,K).
+---
+### Usage
+#### 1) Animate deformation
+```bash 
+python h5_anim.py \
+  path/to/data.h5 \
+  --group OP10/blank \
+  --scale 1.0 \
+  --fps 12 \
+  --skip 2 \
+  --color thickness \
+  --edge
+  ```
+#### 2) Static last frame
+```bash
+python h5_anim.py path/to/data.h5 \
+  --group OP10/blank \
+  --scale 1.2 \
+  --last \
+  --color epsp \
+  --reduce max \
+  --edge \
+  --out last_frame.png
+  ```
+---
+## [pt2png.py](/scr/pt2png.py)
+This script loads a mesh stored in a PyTorch .pt file and renders it as a 3D figure.
+It supports:
+
+- Vertex positions (pos, shape (N,3))
+
+- Quad faces (faces, shape (F,4))
+
+- Optional thickness values (faces_t_float, if available) for per-face coloring
+
+The result is saved as a high-resolution PNG image.
+
+---
+
+Usage 
+---
+```bash
+python plot_mesh.py input.pt --png output.png
+```
+---
+## [png2gif.py](/scr/png2gif.py)
+This script loads a mesh stored in a PyTorch .pt file and renders it as a 3D figure.
+It supports:
+
+- Vertex positions (pos, shape (N,3))
+
+- Quad faces (faces, shape (F,4))
+
+- Optional thickness values (faces_t_float, if available) for per-face coloring
+
+The result is saved as a high-resolution PNG image.
+
+---
+
+Usage 
+---
+```bash
+python plot_mesh.py input.pt --png output.png
+```
+

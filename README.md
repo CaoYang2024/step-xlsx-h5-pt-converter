@@ -1,36 +1,7 @@
 # mesh-format-converter
 A lightweight toolkit for converting forming simulation data (XLSX, STEP) into unified HDF5 / PyTorch formats, with visualization and animation utilities.
-![output of bash_pt2gif](/outputs/animation.gif)
 
-```bash
-HDF5 File Overview
-============================================================
-Attributes:
-  Parameters = {radii2:20.0, radii1:5.0, delta:0.0, cr:1.1, height:25.0}
-  source_tag = tool_radii2_20_radii1_5_cr_1.1_delta_0_height_25
 
-binder/
-  node_coordinates            (N, 3)
-  element_shell_node_indexes  (M, 4)
-  element_shell_ids           (M,)
-
-blank/
-  Tiefgezogenes Bauteil_*     
-    node_coordinates          (N, 3)
-    element_shell_node_ids    (M, 4)
-    element_shell_thickness   (M,)
-
-die/
-  node_coordinates            (N, 3)
-  element_shell_node_indexes  (M, 4)
-  element_shell_ids           (M,)
-
-punch/
-  node_coordinates            (N, 3)
-  element_shell_node_indexes  (M, 4)
-  element_shell_ids           (M,)
-
-```
 ## A collection of scripts to convert and visualize forming mesh data:
 - **h5final.py** — Build unified HDF5 from XLSX + STEP
 - **xlsx2h5.py** — Convert XLSX files to HDF5 groups
@@ -77,7 +48,38 @@ python h5final.py \
   --die-step data/die.step \
   --size 4.0 --quad
   ```
+### Output
+```bash
+HDF5 File Overview
+============================================================
+Attributes:
+  Parameters = {radii2:20.0, radii1:5.0, delta:0.0, cr:1.1, height:25.0}
+  source_tag = tool_radii2_20_radii1_5_cr_1.1_delta_0_height_25
+
+binder/
+  node_coordinates            (N, 3)
+  element_shell_node_indexes  (M, 4)
+  element_shell_ids           (M,)
+
+blank/
+  Tiefgezogenes Bauteil_*     
+    node_coordinates          (N, 3)
+    element_shell_node_ids    (M, 4)
+    element_shell_thickness   (M,)
+
+die/
+  node_coordinates            (N, 3)
+  element_shell_node_indexes  (M, 4)
+  element_shell_ids           (M,)
+
+punch/
+  node_coordinates            (N, 3)
+  element_shell_node_indexes  (M, 4)
+  element_shell_ids           (M,)
+
+```
 ---
+
 ## [h5_shape.py](/scr/h5_shape)
 
 A simple Python CLI tool to explore **HDF5 (.h5)** files.  
@@ -187,3 +189,6 @@ inputs
 `--loop <int>` → Loop count (default: 0 = infinite)
 
 `--no-annotate` → Disable timeline annotation overlay
+
+### Output
+![output of bash_pt2gif](/outputs/animation.gif)

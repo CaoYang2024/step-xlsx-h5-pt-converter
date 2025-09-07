@@ -12,7 +12,7 @@ A lightweight toolkit for converting forming simulation data (XLSX, STEP) into u
 - **pt2png.py** — Quick 3D preview from .pt
 - **png2gif.py** — Make GIF from PNG sequence
 
-## h5final.py
+## [h5nal.py](/scr/h5final.py)
 
 `h5final.py` is a utility script for converting **XLSX (blank sheet data)** and **STEP (tool geometry)** files into a structured **HDF5 (.h5)** file.
 

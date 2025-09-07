@@ -25,3 +25,5 @@ tool_radii2_50_radii1_5_cr_1.1_delta_0_height_25/
 *.lock
 *.h5
 *.gif
+!outputs/*.png
+!outputs/*.gif

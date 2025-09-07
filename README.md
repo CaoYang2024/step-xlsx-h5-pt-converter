@@ -11,6 +11,12 @@ A lightweight toolkit for converting forming simulation data (XLSX, STEP) into u
 - **pt2png.py** — Quick 3D preview from .pt
 - **png2gif.py** — Make GIF from PNG sequence
 ---
+## Batch Data Conversion Pipeline
+- **bash_h5final.sh** — Batch convert simulation folders into a unified HDF5 (.h5) format using `h5final.py`
+- **bash_pt2gif.sh** — End-to-end pipeline from Excel to visualization:
+**Excel → PT → PNG → GIF**.
+- **bash_step2pt_xlsx2pt.sh** — Batch convert Excel (.xlsx/.xls) and STEP (.step) files to PyTorch tensors (.pt).
+---
 ## [h5final.py](/scr/h5final.py)
 
 `h5final.py` is a utility script for converting **XLSX (blank sheet data)** and **STEP (tool geometry)** files into a structured **HDF5 (.h5)** file.

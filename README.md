@@ -1,5 +1,6 @@
 # mesh-format-converter
 A lightweight toolkit for converting forming simulation data (XLSX, STEP) into unified HDF5 / PyTorch formats, with visualization and animation utilities.
+![output of bash_pt2gif](/outputs/animation.gif)
 ## A collection of scripts to convert and visualize forming mesh data:
 - **h5final.py** — Build unified HDF5 from XLSX + STEP
 - **xlsx2h5.py** — Convert XLSX files to HDF5 groups

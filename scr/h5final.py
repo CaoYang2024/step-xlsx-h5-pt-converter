@@ -3,33 +3,33 @@
 
 """
 h5final.py
-一次性生成:
+Generate in one pass:
   <out>.h5
-  ├── blank/           # 每个 xlsx 一个子组: blank/<xlsx_stem>/
-  ├── die/             # 来自 STEP
+  ├── blank/           # one subgroup per XLSX: blank/<xlsx_stem>/
+  ├── die/             # from STEP
   ├── binder/
   └── punch/
 
-blank/<xlsx_stem>/ 写入:
+For blank/<xlsx_stem>/, write:
   node_ids (N,) int64
   node_coordinates (N,3) float64
   element_shell_ids (M,) int64
   element_shell_node_ids (M,4) int64    # 1-based
-  element_shell_thickness (M,) 或 (t,M) float64
+  element_shell_thickness (M,) or (t,M) float64
 
-die/binder/punch 写入:
+For die/binder/punch, write:
   node_ids (N,) int64
   node_coordinates (N,3) float64
   element_shell_node_indexes (M,4) int64  # 0-based
   element_shell_node_ids (M,4) int64      # 1-based
   element_shell_ids (M,) int64
 
-文件属性（file attributes）写入:
-  radii2, radii1, delta, cr, height (标量)
-  Parameters (JSON 字符串，包含上述五个键)
-  source_tag (原始目录/标签名)
+File-level attributes to write:
+  radii2, radii1, delta, cr, height (scalars)
+  Parameters (JSON string containing the five keys above)
+  source_tag (original directory/tag name)
 
-依赖:
+Dependencies:
   pip install numpy pandas h5py openpyxl gmsh
 """
 
@@ -73,7 +73,7 @@ def load_points_thickness_from_xlsx(
     z = pd.to_numeric(df[cz], errors="coerce").to_numpy(float)
     t = pd.to_numeric(df[ct], errors="coerce").to_numpy(float)
 
-    # 过滤掉坐标 NaN 的行（保持 t 对齐）
+    # Filter out rows with NaN coordinates (keep t aligned)
     mask = ~(np.isnan(x) | np.isnan(y) | np.isnan(z))
     x, y, z, t = x[mask], y[mask], z[mask], t[mask]
 
@@ -90,9 +90,10 @@ def build_quads_from_points(
     thickness_source: str = "first",
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    每 4 点组成一个四边形元素。
-    thickness_vec 支持长度 N(逐点, 稀疏亦可) 或 M(逐元素)，M=N//4。
-    thickness_source: 'first' 或 'last' —— 从每组4点取第1或第4个点厚度；若该点为 NaN 则回退到组内第一个非 NaN；组内都 NaN 则置 0。
+    Build one quad element from every 4 consecutive points.
+    thickness_vec supports length N (per-point, possibly sparse) or M (per-element), where M = N // 4.
+    thickness_source: 'first' or 'last' — pick the 1st or 4th point's thickness per group of 4.
+      If that point is NaN, fall back to the first non-NaN in the group; if all NaN, use 0.
     """
     N = coords.shape[0]
     if N % 4 != 0:
@@ -147,24 +148,24 @@ def gmsh_surface_mesh(
     step_path: Path, target_size: Optional[float], prefer_quads: bool
 ) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
     """
-    用 gmsh 对 STEP 做 2D 表面网格。
-    返回:
-      coords: (N,3) float64，被2D单元使用的节点坐标
-      pack:   dict{ 'quads':(Mq,4), 'tris':(Mt,3), 'used_tags':(N,) }  —— 节点标签为 Gmsh NodeTag
+    Use gmsh to generate a 2D surface mesh from a STEP file.
+    Returns:
+      coords: (N,3) float64, node coordinates used by 2D elements
+      pack:   dict{ 'quads':(Mq,4), 'tris':(Mt,3), 'used_tags':(N,) }  — node tags are Gmsh NodeTag
     """
-    import gmsh  # 延迟导入，便于报错时提示安装
+    import gmsh  # lazy import to provide a clear error if missing
 
     gmsh.initialize()
     gmsh.option.setNumber("General.Terminal", 1)
     try:
         gmsh.open(str(step_path))
 
-        # 网格尺寸
+        # Mesh size
         if target_size is not None and target_size > 0:
             gmsh.option.setNumber("Mesh.CharacteristicLengthMin", target_size)
             gmsh.option.setNumber("Mesh.CharacteristicLengthMax", target_size)
 
-        # 优先生成四边（做版本兼容）
+        # Prefer quads (be conservative for version compatibility)
         if prefer_quads:
             gmsh.option.setNumber("Mesh.RecombineAll", 1)
             gmsh.option.setNumber("Mesh.SubdivisionAlgorithm", 1)
@@ -174,10 +175,10 @@ def gmsh_surface_mesh(
                 ents = []
             for (dim, tag) in ents:
                 try:
-                    gmsh.model.mesh.recombine(dim, tag)  # 常见签名
+                    gmsh.model.mesh.recombine(dim, tag)  # common signature
                 except TypeError:
                     try:
-                        gmsh.model.mesh.setRecombine(dim, tag, True)  # 某些版本
+                        gmsh.model.mesh.setRecombine(dim, tag, True)  # other versions
                     except Exception:
                         pass
                 except Exception:
@@ -222,10 +223,10 @@ def build_elem_indexes(
     used_tags: np.ndarray, quads: np.ndarray, tris: np.ndarray, tri_policy: str = "pad_last"
 ) -> np.ndarray:
     """
-    把 Gmsh 的 NodeTag 映射成 0-based 索引连通性。
+    Map Gmsh NodeTag connectivity to 0-based index connectivity.
     tri_policy:
-      - pad_last: 三角 [i,j,k] -> [i,j,k,k]
-      - skip    : 跳过三角
+      - pad_last: triangle [i,j,k] -> [i,j,k,k]
+      - skip    : skip triangles
     """
     tag_to_zero = {int(t): i for i, t in enumerate(used_tags)}
     parts: List[np.ndarray] = []
@@ -258,11 +259,11 @@ def write_tool_group(h5: h5py.File, tool_group: str, node_coords: np.ndarray, el
     g.create_dataset("element_shell_ids", data=np.arange(1, elem_node_indexes.shape[0] + 1, dtype=np.int64))
 
 
-# --------- H5 attributes（从标签解析） ---------
+# --------- H5 attributes (parse from tag) ---------
 def parse_sim_tag(name: str) -> Dict[str, float]:
     """
-    从目录名或文件名解析 radii2/radii1/cr/delta/height，作为 H5 属性存储。
-    例: tool_radii2_50_radii1_5_cr_1.1_delta_0_height_25
+    Parse radii2/radii1/cr/delta/height from a directory or file name and store as H5 attributes.
+    Example: tool_radii2_50_radii1_5_cr_1.1_delta_0_height_25
     """
     kv: Dict[str, float] = {}
     pats = {
@@ -315,23 +316,23 @@ def main():
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     with h5py.File(out_path, "a") as h5:
-        # === 文件属性：单值属性 + 合并 JSON 的 'Parameters' ===
+        # === File attributes: scalar keys + combined JSON 'Parameters' ===
         if args.tag_from:
             tag_name = Path(args.tag_from).name
             attrs = parse_sim_tag(tag_name)  # {'radii2':..., 'radii1':..., 'delta':..., 'cr':..., 'height':...}
             attrs["source_tag"] = tag_name
 
-            # 单个标量属性（若存在）
+            # Individual scalar attributes (if present)
             for k in ("radii2", "radii1", "delta", "cr", "height"):
                 v = attrs.get(k, None)
                 if v is not None:
                     h5.attrs[k] = float(v)
 
-            # 合并 JSON 属性：Parameters
+            # Merge JSON attribute: Parameters
             params_payload = {k: attrs.get(k, None) for k in ("radii2", "radii1", "delta", "cr", "height")}
             h5.attrs["Parameters"] = json.dumps(params_payload, ensure_ascii=False)
 
-            # 附带记录原始标签
+            # Record original tag
             h5.attrs["source_tag"] = tag_name
 
         # ---- XLSX -> blank/<stem> ----

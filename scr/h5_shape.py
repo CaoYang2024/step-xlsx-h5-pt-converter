@@ -4,12 +4,14 @@
 import h5py, argparse, json, numpy as np
 
 def _to_py(v):
-    # 把 numpy 标量/bytes 转成可读的 Python 值
+    # Convert numpy scalars/bytes into readable Python values
     if isinstance(v, bytes):
-        try: return v.decode('utf-8')
-        except: return v
+        try:
+            return v.decode('utf-8')
+        except:
+            return v
     if isinstance(v, np.ndarray) and v.shape == ():
-        v = v[()]  # 标量数组
+        v = v[()]  # scalar array
     if isinstance(v, np.generic):
         return v.item()
     return v
@@ -20,7 +22,7 @@ def _print_attrs(obj, prefix=""):
     print(f"{prefix}@attrs:")
     for k in sorted(obj.attrs.keys()):
         v = _to_py(obj.attrs[k])
-        # 尝试把 Parameters 按 JSON 展开显示
+        # Try to parse "Parameters" as JSON for better readability
         if k == "Parameters" and isinstance(v, (str, bytes)):
             try:
                 parsed = json.loads(v if isinstance(v, str) else v.decode("utf-8"))
@@ -33,7 +35,7 @@ def _print_attrs(obj, prefix=""):
 def show_all(filename, attrs_only=False):
     with h5py.File(filename, "r") as f:
         print(f"file: {filename}\n" + "="*60)
-        # 文件顶层属性
+        # Top-level file attributes
         _print_attrs(f, prefix="/")
         if attrs_only:
             return
@@ -48,8 +50,8 @@ def show_all(filename, attrs_only=False):
         f.visititems(visitor)
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="查看 HDF5 文件的属性与数据集形状")
-    ap.add_argument("h5file", help="输入 .h5 文件路径")
-    ap.add_argument("--attrs-only", action="store_true", help="只显示属性，不显示数据集形状")
+    ap = argparse.ArgumentParser(description="Show HDF5 file attributes and dataset shapes")
+    ap.add_argument("h5file", help="Path to input .h5 file")
+    ap.add_argument("--attrs-only", action="store_true", help="Show only attributes without dataset shapes")
     args = ap.parse_args()
     show_all(args.h5file, attrs_only=args.attrs_only)

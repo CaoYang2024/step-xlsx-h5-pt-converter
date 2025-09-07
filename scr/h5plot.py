@@ -12,6 +12,7 @@ import matplotlib as mpl
 
 # ---------- utils ----------
 def equal_aspect_3d(ax, xyz):
+    """Set equal aspect ratio for 3D axes based on bounding box of xyz points."""
     x, y, z = xyz[:,0], xyz[:,1], xyz[:,2]
     max_range = max(x.max()-x.min(), y.max()-y.min(), z.max()-z.min())
     cx, cy, cz = x.mean(), y.mean(), z.mean()
@@ -19,30 +20,41 @@ def equal_aspect_3d(ax, xyz):
     ax.set_xlim(cx-r, cx+r); ax.set_ylim(cy-r, cy+r); ax.set_zlim(cz-r, cz+r)
 
 def to_zero_based(idx, n_nodes):
+    """Convert indices to zero-based if they look 1-based."""
     idx = np.asarray(idx, dtype=int)
     if idx.min() >= 1 and idx.max() <= n_nodes:
         return idx - 1
     return idx
 
 def load_group(f: h5py.File, group_path: str):
+    """
+    Load geometry, displacements, and scalar fields from HDF5 group.
+    Expected datasets:
+      - node_coordinates (N,3)
+      - element_shell_node_indexes (E,4) or element_shell_node_ids (E,4)
+      - node_displacement (T,N,3) [optional]
+      - element_shell_thickness (T,E) or (E,) [optional]
+      - element_shell_effective_plastic_strain (T,E,K) [optional]
+    """
     g = f[group_path]
     coords = np.asarray(g["node_coordinates"])  # (N,3)
     if "element_shell_node_indexes" in g:
         elems = np.asarray(g["element_shell_node_indexes"])  # (E,4)
     elif "element_shell_node_ids" in g:
-        elems = np.asarray(g["element_shell_node_ids"])      # 兜底
+        elems = np.asarray(g["element_shell_node_ids"])      # fallback
     else:
-        raise KeyError(f"{group_path} 缺少 element_shell_node_indexes / element_shell_node_ids")
+        raise KeyError(f"{group_path} missing element_shell_node_indexes / element_shell_node_ids")
 
     disp = np.asarray(g["node_displacement"]) if "node_displacement" in g else None  # (T,N,3)
 
-    # 可选标量场（单元级）
-    thick = np.asarray(g["element_shell_thickness"]) if "element_shell_thickness" in g else None  # (T,E) or (E,)
-    epsp  = np.asarray(g["element_shell_effective_plastic_strain"]) if "element_shell_effective_plastic_strain" in g else None  # (T,E,3)/...
+    # Optional per-element scalar fields
+    thick = np.asarray(g["element_shell_thickness"]) if "element_shell_thickness" in g else None
+    epsp  = np.asarray(g["element_shell_effective_plastic_strain"]) if "element_shell_effective_plastic_strain" in g else None
 
     return coords, elems, disp, thick, epsp
 
 def scalar_per_element(thick, epsp, which, t_index, reduce_mode="mean"):
+    """Return per-element scalar values (thickness or epsp) at timestep t_index, with optional reduction."""
     if which is None or which == "none": return None
     if which == "thickness" and thick is not None:
         if thick.ndim == 2:  # (T,E)
@@ -62,10 +74,11 @@ def scalar_per_element(thick, epsp, which, t_index, reduce_mode="mean"):
         if reduce_mode == "mean": return A.mean(axis=-1)
         if reduce_mode == "max":  return A.max(axis=-1)
         if reduce_mode == "min":  return A.min(axis=-1)
-        raise ValueError(f"reduce_mode invalid: {reduce_mode}")
+        raise ValueError(f"Invalid reduce_mode: {reduce_mode}")
     return None
 
 def build_quads(pts, elems):
+    """Build list of quad vertex coordinates from points and element connectivity."""
     quads = []
     for e in elems:
         a,b,c,d = e
@@ -84,7 +97,7 @@ def main():
     ap.add_argument("--skip", type=int, default=1, help="Use every K-th timestep")
     ap.add_argument("--edge", action="store_true", help="Draw element edges")
     ap.add_argument("--out", type=Path, default=None, help="Output path (.gif/.mp4/.png). Default: auto")
-    ap.add_argument("--limit_elems", type=int, default=0, help="Optional: randomly sample this many elements for speed (0=all)")
+    ap.add_argument("--limit_elems", type=int, default=0, help="Randomly sample this many elements for speed (0=all)")
     ap.add_argument("--cmap", default="viridis", help="Matplotlib colormap name")
     ap.add_argument("--last", action="store_true", help="Only plot the last frame as a static PNG instead of animation")
     args = ap.parse_args()
@@ -96,10 +109,10 @@ def main():
     elems = to_zero_based(elems, n_nodes)
 
     if disp is None:
-        raise RuntimeError(f"{args.group} 没有 node_displacement，无法做变形动画。")
+        raise RuntimeError(f"{args.group} has no node_displacement; cannot animate deformation.")
 
     if disp.ndim != 3:
-        raise ValueError(f"node_displacement 期望 (T,N,3)，实际 {disp.shape}")
+        raise ValueError(f"node_displacement expected (T,N,3), got {disp.shape}")
     T, N, _ = disp.shape
     frames_t = list(range(0, T, max(1, args.skip)))
     if len(frames_t) == 0: frames_t = [0]
@@ -113,7 +126,7 @@ def main():
     ax = fig.add_subplot(111, projection="3d")
 
     if args.last:
-        # --- 静态图：最后一帧 ---
+        # --- Static plot: last frame ---
         t_last = T - 1
         pts = coords + args.scale * disp[t_last]
         quads = build_quads(pts, elems)
@@ -148,7 +161,7 @@ def main():
         print(f"[OK] Saved static PNG: {out}")
 
     else:
-        # --- 动画 ---
+        # --- Animation ---
         pts0 = coords + args.scale * disp[frames_t[0]]
         quads0 = build_quads(pts0, elems)
         coll = Poly3DCollection(quads0,
@@ -198,7 +211,7 @@ def main():
                 writer = Writer(fps=args.fps, bitrate=4000)
                 ani.save(out, writer=writer, dpi=200)
             except Exception as e:
-                print(f"[WARN] mp4 需要安装 ffmpeg，改存 GIF。({e})")
+                print(f"[WARN] mp4 requires ffmpeg, falling back to GIF. ({e})")
                 out = out.with_suffix(".gif")
                 ani.save(out, writer="pillow", fps=args.fps, dpi=200)
         else:

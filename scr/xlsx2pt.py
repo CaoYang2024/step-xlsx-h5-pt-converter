@@ -11,13 +11,13 @@ import pandas as pd
 import torch
 
 
-# —— 工具函数 ————————————————————————————————————————————————————————————
+# —— Utility Functions ————————————————————————————————————————————————————————————
 def normalize_colname(name: str) -> str:
-    """标准化列名：小写、去空白、把中文括号替换为英文括号、去掉括号内单位等。"""
+    """Normalize column names: lowercase, strip whitespace, replace Chinese brackets with English ones, and remove units in parentheses."""
     s = (name or "").strip().lower()
-    # 全角中文括号 -> 英文
+    # Full-width Chinese parentheses -> English
     s = s.replace("（", "(").replace("）", ")")
-    # 去掉括号（单位）
+    # Remove text inside parentheses (units)
     if "(" in s and ")" in s:
         try:
             l = s.index("(")
@@ -25,17 +25,17 @@ def normalize_colname(name: str) -> str:
             s = (s[:l] + s[r + 1:]).strip()
         except Exception:
             pass
-    # 常见分隔符去掉
+    # Remove common delimiters
     for ch in [" ", "\t", "\n", "\r", ":", "；", ";", "，", ","]:
         s = s.replace(ch, "")
     return s
 
 
 def find_columns(df: pd.DataFrame) -> Tuple[str, str, str, str]:
-    """匹配 x,y,z,t(thickness) 列；支持表头如 x（mm）/x(mm)/thickness 等。"""
+    """Match x, y, z, t(thickness) columns; supports headers like x(mm), thickness, dicke, etc."""
     norm_map: Dict[str, str] = {normalize_colname(c): c for c in df.columns}
 
-    # 允许的别名
+    # Allowed aliases
     x_candidates = ["x"]
     y_candidates = ["y"]
     z_candidates = ["z"]
@@ -45,7 +45,7 @@ def find_columns(df: pd.DataFrame) -> Tuple[str, str, str, str]:
         for c in cands:
             if c in norm_map:
                 return norm_map[c]
-        # 兼容形如 'xmm'、'xcoordinate'（开头包含）
+        # fallback for headers like 'xmm', 'xcoordinate' (prefix match)
         for k, v in norm_map.items():
             if any(k.startswith(c) for c in cands):
                 return v
@@ -58,23 +58,24 @@ def find_columns(df: pd.DataFrame) -> Tuple[str, str, str, str]:
 
     if not all([col_x, col_y, col_z, col_t]):
         if len(df.columns) >= 4:
-            warnings.warn("未准确匹配到列名，按前四列作为 x,y,z,t 兜底。")
+            warnings.warn("Could not match columns reliably; using the first four columns as x,y,z,t fallback.")
             col_x, col_y, col_z, col_t = df.columns[:4]
         else:
-            raise ValueError("Excel 至少需要 4 列（x,y,z,t/thickness）。")
+            raise ValueError("Excel must contain at least 4 columns (x,y,z,t/thickness).")
     return col_x, col_y, col_z, col_t
 
 
 def quantize(arr: np.ndarray, decimals: int) -> np.ndarray:
-    """按小数位数量化（用于去重容忍浮点误差）"""
+    """Quantize array values by rounding to fixed decimals (helps deduplication with float tolerance)."""
     return np.round(arr.astype(np.float64), decimals=decimals)
 
 
 def dedup_points(points: np.ndarray, decimals: int) -> Tuple[np.ndarray, np.ndarray]:
     """
-    点去重：返回 (unique_points, inverse_indices)
-    - unique_points: (M,3)
-    - inverse_indices: (N,) 使得 unique_points[inverse_indices] == quantized(points)
+    Deduplicate points.
+    Returns (unique_points, inverse_indices):
+      - unique_points: (M,3)
+      - inverse_indices: (N,) such that unique_points[inverse_indices] == quantized(points)
     """
     q = quantize(points, decimals)
     dtype = np.dtype((np.void, q.dtype.itemsize * q.shape[1]))
@@ -86,14 +87,15 @@ def dedup_points(points: np.ndarray, decimals: int) -> Tuple[np.ndarray, np.ndar
 
 def build_quads(points: np.ndarray, tvals: np.ndarray, decimals_t: int) -> Tuple[np.ndarray, np.ndarray]:
     """
-    将每 4 行组成 1 个网格，厚度只取该组内的“第一个非空/非 NaN 值”：
-    返回 (quads_points:(G,4,3), quads_t:(G,))
+    Group every 4 rows into 1 quad face.
+    For thickness, take the first non-empty/non-NaN value in the group.
+    Returns (quads_points:(G,4,3), quads_t:(G,))
     """
     n = points.shape[0]
     if n < 4:
-        raise ValueError("数据行数不足 4，无法组成网格。")
+        raise ValueError("Less than 4 rows, cannot form quads.")
     if n % 4 != 0:
-        warnings.warn(f"总行数 {n} 不是 4 的倍数，多出的 {n % 4} 行将被丢弃。")
+        warnings.warn(f"Total rows {n} is not a multiple of 4, discarding extra {n % 4} rows.")
         n = n - (n % 4)
         points = points[:n]
         tvals = tvals[:n]
@@ -104,14 +106,14 @@ def build_quads(points: np.ndarray, tvals: np.ndarray, decimals_t: int) -> Tuple
 
     for g in range(G):
         t_group = tvals[g * 4:(g + 1) * 4]
-        # 厚度取该组第一个非 NaN 值；如果都没有则报错
+        # pick the first non-NaN thickness in the group; raise error if all NaN
         t_val = np.nan
         for tv in t_group:
             if tv is not None and not (isinstance(tv, float) and np.isnan(tv)):
                 t_val = float(tv)
                 break
         if np.isnan(t_val):
-            raise ValueError(f"第 {g+1} 组未找到 thickness（四行均为空/NaN）。")
+            raise ValueError(f"Group {g+1} has no valid thickness (all four rows are empty/NaN).")
         quads_t[g] = t_val
 
     quads_t = quantize(quads_t, decimals_t).astype(np.float32)
@@ -119,7 +121,7 @@ def build_quads(points: np.ndarray, tvals: np.ndarray, decimals_t: int) -> Tuple
 
 
 def indices_from_unique(points_unique: np.ndarray, quads_points: np.ndarray, decimals_xyz: int) -> np.ndarray:
-    """将 quad 中的 4 个坐标映射到唯一点表索引，返回 quads_idx:(G,4)。"""
+    """Map the 4 coordinates of each quad to indices in the unique point table. Returns quads_idx:(G,4)."""
     q_uni = quantize(points_unique, decimals_xyz)
     key_to_idx: Dict[Tuple[float, float, float], int] = {
         (row[0], row[1], row[2]): i for i, row in enumerate(q_uni)
@@ -131,15 +133,15 @@ def indices_from_unique(points_unique: np.ndarray, quads_points: np.ndarray, dec
         for k in range(4):
             key = tuple(qp_q[g, k].tolist())
             if key not in key_to_idx:
-                raise RuntimeError(f"找不到点 {key} 对应的唯一索引，请检查 --decimals_xyz 设置。")
+                raise RuntimeError(f"Point {key} not found in unique index table; check --decimals_xyz setting.")
             quads_idx[g, k] = key_to_idx[key]
     return quads_idx
 
 
 def dedup_quads(quads_idx: np.ndarray, quads_t: np.ndarray, decimals_t: int) -> Tuple[np.ndarray, np.ndarray]:
     """
-    网格去重：忽略 4 点顺序；t 量化后作为 key 的一部分。
-    返回去重后的 (faces:(M,4), t:(M,))
+    Deduplicate quads: ignore vertex ordering; include quantized thickness in the key.
+    Returns (faces:(M,4), t:(M,))
     """
     keys = {}
     faces_list: List[List[int]] = []
@@ -160,56 +162,56 @@ def dedup_quads(quads_idx: np.ndarray, quads_t: np.ndarray, decimals_t: int) -> 
     return faces, t
 
 
-# —— 主流程 ——————————————————————————————————————————————————————————————
+# —— Main Process ——————————————————————————————————————————————————————————————
 def main():
-    ap = argparse.ArgumentParser(description="Convert Excel (x,y,z,thickness per 4 points) to .pt with de-duplicated points & quads.")
-    ap.add_argument("excel", type=Path, help="输入 Excel 路径（.xlsx/.xls）")
-    ap.add_argument("out_pt", type=Path, help="输出 .pt 路径")
-    ap.add_argument("--sheet", type=str, default=None, help="工作表名（默认第一个）")
-    ap.add_argument("--decimals_xyz", type=int, default=6, help="点坐标量化小数位（用于点去重）")
-    ap.add_argument("--decimals_t", type=int, default=6, help="厚度量化小数位（用于网格去重）")
-    ap.add_argument("--unit_scale", type=float, default=1.0, help="单位缩放（例如 mm->m 可设为 0.001）")
+    ap = argparse.ArgumentParser(description="Convert Excel (x,y,z,thickness per 4 points) to .pt with deduplicated points & quads.")
+    ap.add_argument("excel", type=Path, help="Input Excel path (.xlsx/.xls)")
+    ap.add_argument("out_pt", type=Path, help="Output .pt path")
+    ap.add_argument("--sheet", type=str, default=None, help="Worksheet name (default: first sheet)")
+    ap.add_argument("--decimals_xyz", type=int, default=6, help="Quantization decimals for coordinates (dedup tolerance)")
+    ap.add_argument("--decimals_t", type=int, default=6, help="Quantization decimals for thickness (dedup tolerance)")
+    ap.add_argument("--unit_scale", type=float, default=1.0, help="Unit scale (e.g., use 0.001 for mm -> m)")
     args = ap.parse_args()
 
-    # 读取 Excel
+    # Load Excel
     df = pd.read_excel(args.excel, sheet_name=args.sheet) if args.sheet else pd.read_excel(args.excel)
 
     col_x, col_y, col_z, col_t = find_columns(df)
     xyz = df[[col_x, col_y, col_z]].to_numpy(dtype=np.float64)
     tvals = df[[col_t]].to_numpy(dtype=np.float64).reshape(-1)
 
-    # 单位换算（若表头是 mm，默认 unit_scale=1.0；需要转米可传 0.001）
+    # Apply unit scaling (e.g. if input in mm and you want meters, set --unit_scale=0.001)
     if args.unit_scale != 1.0:
         xyz = xyz * float(args.unit_scale)
 
-    # 每 4 行 -> 1 个网格；厚度取组内第一个非 NaN
+    # Group every 4 rows -> 1 quad; thickness = first non-NaN value in the group
     quads_points, quads_t = build_quads(xyz, tvals, args.decimals_t)
 
-    # 点去重
+    # Deduplicate points
     all_points = quads_points.reshape(-1, 3)
     points_unique, _ = dedup_points(all_points, args.decimals_xyz)
 
-    # 建立网格索引
+    # Build quad indices into unique point table
     quads_idx = indices_from_unique(points_unique, quads_points, args.decimals_xyz)
 
-    # 网格去重
+    # Deduplicate quads
     faces, t_unique = dedup_quads(quads_idx, quads_t, args.decimals_t)
 
-    # 组织并保存
+    # Package and save
     out_obj = {
         "pos": points_unique.astype(np.float32),          # (M,3)
         "faces": faces.astype(np.int64),                  # (N,4)
-        # 方便下游直接用 (ID1, ID2, ID3, ID4, t)：
+        # Convenience: directly usable (ID1, ID2, ID3, ID4, t)
         "faces_t_float": np.hstack([faces.astype(np.float32),
                                     t_unique.reshape(-1, 1)]).astype(np.float32)  # (N,5)
     }
     torch.save(out_obj, args.out_pt)
 
     print("==== Done ====")
-    print(f"输入文件: {args.excel}")
-    print(f"唯一点数 M: {out_obj['pos'].shape[0]}")
-    print(f"去重后网格数 N: {out_obj['faces'].shape[0]}")
-    print(f".pt 已保存: {args.out_pt}")
+    print(f"Input file: {args.excel}")
+    print(f"Unique points M: {out_obj['pos'].shape[0]}")
+    print(f"Deduplicated quads N: {out_obj['faces'].shape[0]}")
+    print(f".pt saved: {args.out_pt}")
 
 
 if __name__ == "__main__":

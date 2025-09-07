@@ -115,22 +115,38 @@ python plot_mesh.py input.pt --png output.png
 ```
 ---
 ## [png2gif.py](/scr/png2gif.py)
-This script loads a mesh stored in a PyTorch .pt file and renders it as a 3D figure.
+This script combines a sequence of PNG images into an animated GIF.
 It supports:
 
-- Vertex positions (pos, shape (N,3))
+- Input as either a directory of PNG files or a list of files
 
-- Quad faces (faces, shape (F,4))
+- Automatic natural sorting by numeric suffix (e.g., Tiefgezogenes Bauteil_15000.png)
 
-- Optional thickness values (faces_t_float, if available) for per-face coloring
+- Automatic resizing to the largest canvas so all frames fit consistently
 
-The result is saved as a high-resolution PNG image.
+- Optional timeline annotation (numbers extracted from filenames)
 
+- Configurable frame rate (fps) and loop count
 ---
 
 Usage 
 ---
 ```bash
-python plot_mesh.py input.pt --png output.png
+python make_gif.py <inputs> --gif <output.gif> [options]
 ```
 
+Arguments
+---
+inputs
+
+- A single directory containing PNGs matching Tiefgezogenes Bauteil_<number>.png
+
+- Or one or more explicit PNG file paths
+
+`--gif <path>` → Output GIF file path (required)
+
+`--fps <int>`→ Frames per second (default: 5)
+
+`--loop <int>` → Loop count (default: 0 = infinite)
+
+`--no-annotate` → Disable timeline annotation overlay

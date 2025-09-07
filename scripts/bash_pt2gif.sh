@@ -1,22 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 根目录，传入 /mnt/data/hsh/raw（里面有 tool_*）
+# Root directory, e.g. pass /mnt/data/hsh/raw (which contains tool_*)
 ROOT_DIR="${1:-$(pwd)}"
 
-# Python 和脚本路径
+# Python interpreter and script paths
 PYTHON=python
 EXCEL_TO_PT="/home/RUS_CIP/st186635/format_transformate/xlsx2pt.py"
 PT_TO_PNG="/home/RUS_CIP/st186635/format_transformate/pt2png.py"
 PNG_TO_GIF="/home/RUS_CIP/st186635/format_transformate/png2gif.py"
 
+# Iterate through tool_* directories
 for tooldir in "${ROOT_DIR}"/tool_*; do
   [ -d "$tooldir/Data" ] || continue
   datadir="$tooldir/Data"
 
   echo "=== Processing $datadir ==="
 
-  # 1) Excel -> PT（覆盖旧文件）
+  # 1) Excel -> PT (overwrite existing .pt files)
   for excel in "$datadir"/*.xlsx "$datadir"/*.xls; do
     [ -e "$excel" ] || continue
     out="${excel%.*}.pt"
@@ -25,7 +26,7 @@ for tooldir in "${ROOT_DIR}"/tool_*; do
     $PYTHON "$EXCEL_TO_PT" "$excel" "$out"
   done
 
-  # 2) PT -> PNG（跳过 01_/02_/03_）
+  # 2) PT -> PNG (skip 01_/02_/03_ prefixed files)
   for ptf in "$datadir"/*.pt; do
     [ -e "$ptf" ] || continue
     base=$(basename "$ptf")
@@ -38,7 +39,7 @@ for tooldir in "${ROOT_DIR}"/tool_*; do
     $PYTHON "$PT_TO_PNG" "$ptf" --png "$out"
   done
 
-  # 3) PNG -> GIF（调用你改过的 py，内部已倒序）
+  # 3) PNG -> GIF (calls modified Python script, internally reverse-sorted)
   gif_out="$datadir/animation.gif"
   echo "[PNG->GIF] -> $gif_out"
   $PYTHON "$PNG_TO_GIF" "$datadir" --gif "$gif_out" --fps 5 --loop 0

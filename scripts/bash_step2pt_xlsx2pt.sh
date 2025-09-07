@@ -1,33 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ====== 配置区（按需修改） ======
-# 根目录：包含 07_dataset_numisheet_tp_8.zip 和那些 tool_radii2_* 文件夹
+# ====== CONFIGURATION (modify if needed) ======
+# Root directory: should contain 07_dataset_numisheet_tp_8.zip and tool_radii2_* folders
 ROOT_DIR="${1:-$(pwd)}"
 
-# 转换脚本路径（请改成你的实际路径）
-EXCEL_TO_PT_PY="/home/RUS_CIP/st186635/format_transformate/xlsx2pt.py"       # 你刚写的 xlsx -> pt
-STEP_TO_PT_PY="/home/RUS_CIP/st186635/format_transformate/step2pt.py"     # 你的 step -> pt 脚本
+# Converter script paths (change to your actual paths)
+EXCEL_TO_PT_PY="/home/RUS_CIP/st186635/format_transformate/xlsx2pt.py"   # Excel -> .pt
+STEP_TO_PT_PY="/home/RUS_CIP/st186635/format_transformate/step2pt.py"    # STEP -> .pt
 
-# STEP 转换的可选参数（留空就不传；比如你之前用过 --lc 和 --target_points）
-STEP_LC="${STEP_LC:-}"                # 例如：1.5
-STEP_TARGET_POINTS="${STEP_TARGET_POINTS:-}"   # 例如：80000
+# Optional parameters for STEP conversion (leave empty to disable)
+STEP_LC="${STEP_LC:-}"                # Example: 1.5
+STEP_TARGET_POINTS="${STEP_TARGET_POINTS:-}"   # Example: 80000
 
-# 是否跳过已存在的 .pt（默认 1 表示跳过；设为 0 代表覆盖重跑）
+# Skip existing .pt files? (default = 1 = skip; set to 0 to overwrite)
 SKIP_EXISTING="${SKIP_EXISTING:-1}"
-# ===============================
+# ==============================================
 
 echo "[Info] ROOT_DIR = ${ROOT_DIR}"
 echo "[Info] Using Excel converter: ${EXCEL_TO_PT_PY}"
 echo "[Info] Using STEP converter : ${STEP_TO_PT_PY}"
 
-# 如果有压缩包，先解压（-n 不覆盖已存在文件）
+# If the dataset zip exists, extract it (with -n to avoid overwriting existing files)
 if [ -f "${ROOT_DIR}/07_dataset_numisheet_tp_8.zip" ]; then
   echo "[Info] Found zip, extracting ..."
   (cd "${ROOT_DIR}" && unzip -n "07_dataset_numisheet_tp_8.zip")
 fi
 
-# 构造 STEP 可选参数
+# Construct optional STEP arguments
 STEP_OPTS=()
 if [ -n "${STEP_LC}" ]; then
   STEP_OPTS+=(--lc "${STEP_LC}")
@@ -36,7 +36,7 @@ if [ -n "${STEP_TARGET_POINTS}" ]; then
   STEP_OPTS+=(--target_points "${STEP_TARGET_POINTS}")
 fi
 
-# 遍历所有 tool_* 目录
+# Iterate through all tool_* directories
 shopt -s nullglob
 for tooldir in "${ROOT_DIR}"/tool_*; do
   [ -d "${tooldir}" ] || continue
@@ -47,7 +47,7 @@ for tooldir in "${ROOT_DIR}"/tool_*; do
   echo "[Info] Processing ${datadir}"
   echo "=============================="
 
-  # 1) 处理 Excel
+  # 1) Process Excel files
   for excel in "${datadir}"/*.xlsx "${datadir}"/*.xls; do
     [ -e "${excel}" ] || continue
     out="${excel%.*}.pt"
@@ -56,13 +56,13 @@ for tooldir in "${ROOT_DIR}"/tool_*; do
       continue
     fi
     echo "[Run ][Excel] ${excel} -> ${out}"
-    # 你的 main.py 已自动识别列名（x (mm), y (mm), z (mm), shell thickness (mm)）
-    # 若想手动指定列名，可在下面命令末尾加：
+    # Your xlsx2pt.py automatically detects column names (x (mm), y (mm), z (mm), shell thickness (mm)).
+    # If you want to specify manually, append parameters such as:
     #   --xyz-cols "x (mm),y (mm),z (mm)" --thick-col "shell thickness (mm)"
     python "${EXCEL_TO_PT_PY}" "${excel}" "${out}"
   done
 
-  # 2) 处理 STEP
+  # 2) Process STEP files
   for stepf in "${datadir}"/*.step; do
     [ -e "${stepf}" ] || continue
     out="${stepf%.*}.pt"
@@ -71,7 +71,7 @@ for tooldir in "${ROOT_DIR}"/tool_*; do
       continue
     fi
     echo "[Run ][STEP ] ${stepf} -> ${out}"
-    # 你的 step2pt.py 如果需要其他参数（比如输出名、体素大小等），在此追加
+    # If your step2pt.py requires additional parameters (e.g., voxel size, output name), append them here.
     python "${STEP_TO_PT_PY}" "${stepf}" "${out}" "${STEP_OPTS[@]}"
   done
 done

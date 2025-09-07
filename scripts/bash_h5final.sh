@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 用法: bash batch_h5_build.sh <ROOT_DIR> [H5_DIR]
-# 例:  bash batch_h5_build.sh /home/RUS_CIP/st186635/format_transformate
-# 若不传 H5_DIR，默认写到 <ROOT_DIR>/h5
+# Usage: bash batch_h5_build.sh <ROOT_DIR> [H5_DIR]
+# Example: bash batch_h5_build.sh /home/RUS_CIP/st186635/format_transformate
+# If H5_DIR is omitted, defaults to <ROOT_DIR>/h5
 
 ROOT="${1:-$PWD}"
 H5_DIR="${2:-$ROOT/h5}"
-H5FINAL="/home/RUS_CIP/st186635/format_transformate/h5final.py"
+H5FINAL="/home/RUS_CIP/st186635/format_transformate/h5final.py"  # <-- Adjust if your h5final.py path differs
 
 mkdir -p "$H5_DIR"
 MAP_CSV="$H5_DIR/mapping.csv"
@@ -15,7 +15,7 @@ echo "h5_name,h5_path,source_dir,radii2,radii1,delta,cr,height" > "$MAP_CSV"
 
 shopt -s nullglob
 
-# 优先遍历 ROOT/*/Data；如无该结构，退回 ROOT/*（兼容两种目录形态）
+# Prefer ROOT/*/Data; if not present, fall back to ROOT/* (supporting two directory layouts)
 DATADIRS=()
 if compgen -G "$ROOT"/*/Data > /dev/null; then
   for D in "$ROOT"/*/Data; do [[ -d "$D" ]] && DATADIRS+=("$D"); done
@@ -25,8 +25,8 @@ fi
 
 for DATADIR in "${DATADIRS[@]}"; do
   if [[ "$(basename "$DATADIR")" == "Data" ]]; then
-    SRCDIR="$(dirname "$DATADIR")"   # Data 的父目录
-    BASENAME="$(basename "$SRCDIR")" # 以父目录名做 H5 文件名
+    SRCDIR="$(dirname "$DATADIR")"   # Parent of Data
+    BASENAME="$(basename "$SRCDIR")" # Use parent folder name as H5 base name
     XLSX_DIR="$DATADIR"
   else
     SRCDIR="$DATADIR"
@@ -42,7 +42,7 @@ for DATADIR in "${DATADIRS[@]}"; do
 
   OUT="$H5_DIR/$BASENAME.h5"
 
-  # 收集 STEP（优先 Data/，否则父目录）
+  # Collect STEP files (prefer in Data/, otherwise in parent)
   declare -A STEP_MAP=( ["die"]="" ["binder"]="" ["punch"]="" )
   step_candidates=( "$SRCDIR"/Data/*.step "$SRCDIR"/*.step )
   for S in "${step_candidates[@]}"; do
@@ -52,7 +52,7 @@ for DATADIR in "${DATADIRS[@]}"; do
     [[ -z "${STEP_MAP[binder]}" && "$name_lc" == *"niederhalter"* ]] && STEP_MAP[binder]="$S"
     [[ -z "${STEP_MAP[punch]}"  && "$name_lc" == *"stempel"*      ]] && STEP_MAP[punch]="$S"
   done
-  # 兜底：按发现顺序把未匹配到的 step 填入空位
+  # Fallback: fill any missing roles in discovery order
   uniq_steps=()
   for S in "${step_candidates[@]}"; do [[ -e "$S" ]] && uniq_steps+=("$S"); done
   mapfile -t uniq_steps < <(printf "%s\n" "${uniq_steps[@]}" | awk '!seen[$0]++')
@@ -63,22 +63,22 @@ for DATADIR in "${DATADIRS[@]}"; do
     fi
   done
 
-  # 没有 xlsx、也没有任何 step 就跳过
+  # Skip if neither XLSX nor any STEP is found
   if [[ -z "$XLSX_DIR" && -z "${STEP_MAP[die]}" && -z "${STEP_MAP[binder]}" && -z "${STEP_MAP[punch]}" ]]; then
     echo "[Skip] $SRCDIR (no xlsx/step found)"
     continue
   fi
 
-  # 覆盖式：删除旧 H5
+  # Overwrite: remove existing H5
   rm -f "$OUT"
 
-  # 组装 h5final.py 命令
+  # Assemble h5final.py command
   CMD=( python "$H5FINAL" --out "$OUT" --tag-from "$SRCDIR" )
   [[ -n "$XLSX_DIR"          ]] && CMD+=( --xlsx-dir "$XLSX_DIR" )
   [[ -n "${STEP_MAP[die]}"    ]] && CMD+=( --die-step    "${STEP_MAP[die]}" )
   [[ -n "${STEP_MAP[binder]}" ]] && CMD+=( --binder-step "${STEP_MAP[binder]}" )
   [[ -n "${STEP_MAP[punch]}"  ]] && CMD+=( --punch-step  "${STEP_MAP[punch]}" )
-  # 你的网格参数
+  # Mesh controls (tweak as needed)
   CMD+=( --quad --size 5.0 )
 
   echo "[RUN] ${CMD[*]}"
@@ -87,14 +87,14 @@ for DATADIR in "${DATADIRS[@]}"; do
     continue
   fi
 
-  # —— 从 BASENAME 解析参数（允许负号与小数）
+  # —— Parse parameters from BASENAME (allow minus sign and decimals)
   read -r radii2 radii1 delta cr height < <(python - "$BASENAME" <<'PY'
 import re,sys
 name=sys.argv[1]
 def pick(p): 
     m=re.search(p,name)
     return m.group(1) if m else ""
-# 顺序：radii2,radii1,delta,cr,height
+# Order: radii2,radii1,delta,cr,height
 vals=[
     pick(r"radii2_([\-0-9]+(?:\.[0-9]+)?)"),
     pick(r"radii1_([\-0-9]+(?:\.[0-9]+)?)"),
@@ -106,7 +106,7 @@ print(*vals)
 PY
 )
 
-  # —— 把参数写进 H5 的文件属性：单个键 + 合并的 JSON 键 "Parameters"
+  # —— Write attributes into H5: individual keys + merged JSON "Parameters"
   python - "$OUT" "$radii2" "$radii1" "$delta" "$cr" "$height" <<'PY'
 import sys,json,h5py,math
 path, radii2, radii1, delta, cr, height = sys.argv[1:7]
@@ -122,15 +122,15 @@ def to_num_or_none(s):
     return s
 nums = {k: to_num_or_none(v) for k,v in vals.items()}
 with h5py.File(path, "a") as f:
-    # 单个标量属性（若有值）
+    # Individual scalar attrs (if present)
     for k,v in nums.items():
         if v is not None:
             f.attrs[k] = v
-    # 合并 JSON 属性
+    # Combined JSON attr
     f.attrs["Parameters"] = json.dumps(nums, ensure_ascii=False)
 PY
 
-  # —— 记录到 CSV（追加参数列）
+  # —— Log into CSV (append parameters)
   echo "$BASENAME.h5,$OUT,$SRCDIR,$radii2,$radii1,$delta,$cr,$height" >> "$MAP_CSV"
 done
 

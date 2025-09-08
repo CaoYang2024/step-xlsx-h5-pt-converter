@@ -19,7 +19,7 @@ A lightweight toolkit for converting forming simulation data (XLSX, STEP) into u
 **Excel → PT → PNG → GIF**.
 - **bash_step2pt_xlsx2pt.sh** — Batch convert Excel (.xlsx/.xls) and STEP (.step) files to PyTorch tensors (.pt).
 ---
-## [h5final.py](/scr/h5final.py)
+## [h5final.py](/src/h5final.py)
 
 `h5final.py` is a utility script for converting **XLSX (blank sheet data)** and **STEP (tool geometry)** files into a structured **HDF5 (.h5)** file.
 ### Usage
@@ -80,7 +80,7 @@ punch/
 ```
 ---
 
-## [h5_shape.py](/scr/h5_shape)
+## [h5_shape.py](/src/h5_shape)
 
 A simple Python CLI tool to explore **HDF5 (.h5)** files.  
 It prints out **file attributes, group attributes, and dataset shapes**.  
@@ -93,7 +93,7 @@ python h5show.py your_file.h5
 ```
 ---
 
-## [h5plot](/scr/h5plot.py)
+## [h5plot](/src/h5plot.py)
 
 This script visualizes **FE shell meshes** stored in an HDF5 file and can:
 
@@ -133,7 +133,7 @@ python h5_anim.py path/to/data.h5 \
   --out last_frame.png
   ```
 ---
-## [pt2png.py](/scr/pt2png.py)
+## [pt2png.py](/src/pt2png.py)
 This script loads a mesh stored in a PyTorch .pt file and renders it as a 3D figure.
 It supports:
 
@@ -153,7 +153,7 @@ Usage
 python plot_mesh.py input.pt --png output.png
 ```
 ---
-## [png2gif.py](/scr/png2gif.py)
+## [png2gif.py](/src/png2gif.py)
 This script combines a sequence of PNG images into an animated GIF.
 It supports:
 

@@ -4,20 +4,21 @@ A lightweight toolkit for converting forming simulation data (XLSX, STEP) into u
 
 ## A collection of scripts to convert and visualize forming mesh data:
 - **h5_build.py** — Build unified HDF5 from XLSX + STEP
+- **h5_shape.py** — Inspect attributes and dataset shapes
+- **h5plot.py** — Animate deformations (GIF/MP4/PNG)
+---
 - **xlsx2h5.py** — Convert XLSX files to HDF5 groups
 - **xlsx2pt.py** — Convert XLSX to PyTorch .pt (deduplicated quads)
 - **step2pt.py** — Mesh STEP with Gmsh, export to PyTorch .pt
 - **step2h5.py** — Mesh STEP with Gmsh, export to HDF5 groups
-- **h5plot.py** — Animate deformations (GIF/MP4/PNG)
-- **h5_shape.py** — Inspect attributes and dataset shapes
 - **pt2png.py** — Quick 3D preview from .pt
 - **png2gif.py** — Make GIF from PNG sequence
 ---
 ## Batch Data Conversion Pipeline
-- **bash_h5final.sh** — Batch convert simulation folders into a unified HDF5 (.h5) format using `h5_build.py`
+- **bash_h5final.sh** — Batch convert simulation folders into a unified **HDF5 (.h5)** format using `h5_build.py`
 - **bash_pt2gif.sh** — End-to-end pipeline from Excel to visualization:
 **Excel → PT → PNG → GIF**.
-- **bash_step2pt_xlsx2pt.sh** — Batch convert Excel (.xlsx/.xls) and STEP (.step) files to PyTorch tensors (.pt).
+- **bash_step2pt_xlsx2pt.sh** — Batch convert **Excel (.xlsx/.xls**)** and **STEP (.step)** files to **PyTorch tensors (.pt)**.
 ---
 ## [h5_build.py](/src/h5_build.py)
 
